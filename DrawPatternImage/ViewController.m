@@ -57,8 +57,8 @@ CGContextRef CreateBitmapContext(int width, int height, CGColorSpaceRef colorSpa
     CGContextSetRGBFillColor (myBitmapContext, 0, 0, 0, 1);
     CGContextFillRect (myBitmapContext, CGRectMake (0, 0, myWidth, myHeight ));
     
-    // Fill an inner diamond with white
-    CGContextSetRGBFillColor(myBitmapContext, 1, 1, 1, 1);
+    // Fill an inner diamond with red
+    CGContextSetRGBFillColor(myBitmapContext, 1, 0, 0, 1);
     CGContextBeginPath(myBitmapContext);
     CGContextMoveToPoint(myBitmapContext, myWidth/2.0, 2);
     CGContextAddLineToPoint(myBitmapContext, myWidth-2.0, myHeight/2.0);
@@ -80,13 +80,152 @@ CGContextRef CreateBitmapContext(int width, int height, CGColorSpaceRef colorSpa
     return image;
 }
 
+-(UIImage *)filledDoughnutForSize:(CGSize)size
+{
+    size_t myWidth = size.width;
+    size_t myHeight = size.height;
+    
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    CGContextRef myBitmapContext = CreateBitmapContext(myWidth, myHeight, colorSpace, kCGImageAlphaPremultipliedLast);
+    CGColorSpaceRelease(colorSpace);
+
+    // Draw a circle in the square
+    CGFloat offsetX = 2;
+    CGFloat offsetY = 2;
+    CGFloat diameter = MIN(myWidth-2, myHeight-2);
+    if (myWidth < myHeight)
+        offsetY += (myHeight - myWidth) / 2.0;
+    if (myHeight < myWidth)
+        offsetX += (myWidth - myHeight) / 2.0;
+    
+    // Fill an inner circle with green
+    CGContextSetRGBFillColor(myBitmapContext, 0, 1, 0, 1);
+    CGContextAddPath(myBitmapContext, [UIBezierPath bezierPathWithRoundedRect:CGRectMake(offsetX, offsetY, diameter, diameter)
+                                                            byRoundingCorners:UIRectCornerAllCorners
+                                                                  cornerRadii:CGSizeMake(diameter/2.0, diameter/2.0)].CGPath);
+    CGContextFillPath(myBitmapContext);
+    
+    // Fill a circle inside the first one with white
+    offsetX += 20;
+    offsetY += 20;
+    diameter -= 40;
+    CGContextSetRGBFillColor(myBitmapContext, 1, 1, 1, 1);
+    CGContextAddPath(myBitmapContext, [UIBezierPath bezierPathWithRoundedRect:CGRectMake(offsetX, offsetY, diameter, diameter)
+                                                            byRoundingCorners:UIRectCornerAllCorners
+                                                                  cornerRadii:CGSizeMake(diameter/2.0, diameter/2.0)].CGPath);
+    CGContextFillPath(myBitmapContext);
+    
+    // Create an image ref from the context
+    CGImageRef imageRef = CGBitmapContextCreateImage (myBitmapContext);
+    CGContextRelease (myBitmapContext);
+    
+    // Turn the image ref into a UIImage 
+    UIImage *image = [UIImage imageWithCGImage:imageRef];
+    
+    CGImageRelease(imageRef);
+    
+    return image;
+}
+
+-(UIImage *)emptyDoughnutForSize:(CGSize)size
+{
+    size_t myWidth = size.width;
+    size_t myHeight = size.height;
+    
+    // Draw a circle in the square
+    CGFloat offsetX = 2;
+    CGFloat offsetY = 2;
+    CGFloat diameter = MIN(myWidth-2, myHeight-2);
+    if (myWidth < myHeight)
+        offsetY += (myHeight - myWidth) / 2.0;
+    if (myHeight < myWidth)
+        offsetX += (myWidth - myHeight) / 2.0;
+    
+    CGImageRef imageRef;
+    {
+        CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+        CGContextRef myBitmapContext = CreateBitmapContext(myWidth, myHeight, colorSpace, kCGImageAlphaPremultipliedLast);
+        CGColorSpaceRelease(colorSpace);
+        
+        // Fill an inner circle with green
+        CGContextSetRGBFillColor(myBitmapContext, 0, 1, 0, 1);
+        CGContextAddPath(myBitmapContext, [UIBezierPath bezierPathWithRoundedRect:CGRectMake(offsetX, offsetY, diameter, diameter)
+                                                                byRoundingCorners:UIRectCornerAllCorners
+                                                                      cornerRadii:CGSizeMake(diameter/2.0, diameter/2.0)].CGPath);
+        CGContextFillPath(myBitmapContext);
+        
+        // Create an image ref from the context
+        imageRef = CGBitmapContextCreateImage (myBitmapContext);
+        CGContextRelease (myBitmapContext);
+    }
+    
+    // We need to create a mask for the area of our drawing that we want no color to appear.
+    // We do that using a greyscale context.
+
+    CGImageRef maskImageRef;
+    {
+        CGColorSpaceRef colorSpaceGray = CGColorSpaceCreateDeviceGray();
+        CGContextRef myBitmapContextGray = CreateBitmapContext(myWidth, myHeight, colorSpaceGray, kCGImageAlphaNone);
+        CGColorSpaceRelease( colorSpaceGray );
+
+        // Fill the square with white. This is the part to keep.
+        CGContextSetGrayFillColor(myBitmapContextGray, 1, 1);
+        CGContextAddRect(myBitmapContextGray, CGRectMake(0, 0, myWidth, myHeight));
+        CGContextFillPath(myBitmapContextGray);
+
+        // Fill a circle inside the first one with black. This is the part to discard.
+        offsetX += 20;
+        offsetY += 20;
+        diameter -= 40;
+        CGContextSetGrayFillColor(myBitmapContextGray, 0, 1);
+        CGContextAddPath(myBitmapContextGray, [UIBezierPath bezierPathWithRoundedRect:CGRectMake(offsetX, offsetY, diameter, diameter)
+                                                                byRoundingCorners:UIRectCornerAllCorners
+                                                                      cornerRadii:CGSizeMake(diameter/2.0, diameter/2.0)].CGPath);
+        CGContextFillPath(myBitmapContextGray);
+        
+        // Create an image ref from the context
+        maskImageRef = CGBitmapContextCreateImage (myBitmapContextGray);
+        CGContextRelease (myBitmapContextGray);
+    }
+    
+    // Now, we have to merge the two images to create the final image with a transparent inner circle
+    CGImageRef finalImage = CGImageCreateWithMask(imageRef, maskImageRef);
+    
+    // Turn the image ref into a UIImage
+    UIImage *image = [UIImage imageWithCGImage:finalImage];
+    
+    CGImageRelease(imageRef);
+    CGImageRelease(maskImageRef);
+    CGImageRelease(finalImage);
+    
+    return image;
+}
+
 -(void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:animated];
     
+    // Create a 16x16 image that is a red diamond on a black background
     UIImage *image = [self patternImageWithSize:CGSizeMake(16,16) forRectSize:self.view.frame.size];
-    
+
+    // Fill the background of the main view with this pattern
     self.view.backgroundColor = [UIColor colorWithPatternImage:image];
+    
+    // Using similar techniques, illustrate how to create an image with holes in it utilizing an image mask
+    
+    // Create a UIImageView, and an image
+    UIImageView *imageView = [[UIImageView alloc] initWithFrame:CGRectMake(100, 20, 120, 120)];
+    imageView.image = [self filledDoughnutForSize:imageView.frame.size];
+    
+    [self.view addSubview:imageView];  // Green doughnut with white center
+    
+    // Wouldn't it be cool, though, if we could have a green ring with no center?
+    
+    imageView = [[UIImageView alloc] initWithFrame:CGRectMake(100, 150, 120, 120)];
+    imageView.image = [self emptyDoughnutForSize:imageView.frame.size];
+    
+    [self.view addSubview:imageView];
+
 }
 
 - (void)didReceiveMemoryWarning
