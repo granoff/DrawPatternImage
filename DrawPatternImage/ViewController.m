@@ -73,7 +73,7 @@ CGContextRef CreateBitmapContext(int width, int height, CGColorSpaceRef colorSpa
     CGContextRelease (myBitmapContext);
 
     // Turn the image ref into a UIImage that can be used with UIColor's -colorWithPatternImage:
-    UIImage *image = [UIImage imageWithCGImage:imageRef];
+    UIImage *image = [UIImage imageWithCGImage:imageRef scale:[[UIScreen mainScreen] scale] orientation:UIImageOrientationUp];
     
     CGImageRelease(imageRef);
     
@@ -106,9 +106,10 @@ CGContextRef CreateBitmapContext(int width, int height, CGColorSpaceRef colorSpa
     CGContextFillPath(myBitmapContext);
     
     // Fill a circle inside the first one with white
-    offsetX += 20;
-    offsetY += 20;
-    diameter -= 40;
+    CGFloat adjustment = myWidth/4;
+    offsetX += adjustment;
+    offsetY += adjustment;
+    diameter -= 2*adjustment;
     CGContextSetRGBFillColor(myBitmapContext, 1, 1, 1, 1);
     CGContextAddPath(myBitmapContext, [UIBezierPath bezierPathWithRoundedRect:CGRectMake(offsetX, offsetY, diameter, diameter)
                                                             byRoundingCorners:UIRectCornerAllCorners
@@ -120,7 +121,7 @@ CGContextRef CreateBitmapContext(int width, int height, CGColorSpaceRef colorSpa
     CGContextRelease (myBitmapContext);
     
     // Turn the image ref into a UIImage 
-    UIImage *image = [UIImage imageWithCGImage:imageRef];
+    UIImage *image = [UIImage imageWithCGImage:imageRef scale:[[UIScreen mainScreen] scale] orientation:UIImageOrientationUp];
     
     CGImageRelease(imageRef);
     
@@ -174,9 +175,10 @@ CGContextRef CreateBitmapContext(int width, int height, CGColorSpaceRef colorSpa
         CGContextFillPath(myBitmapContextGray);
 
         // Fill a circle inside the first one with black. This is the part to discard.
-        offsetX += 20;
-        offsetY += 20;
-        diameter -= 40;
+        CGFloat adjustment = myWidth/4;
+        offsetX += adjustment;
+        offsetY += adjustment;
+        diameter -= 2*adjustment;
         CGContextSetGrayFillColor(myBitmapContextGray, 0, 1);
         CGContextAddPath(myBitmapContextGray, [UIBezierPath bezierPathWithRoundedRect:CGRectMake(offsetX, offsetY, diameter, diameter)
                                                                 byRoundingCorners:UIRectCornerAllCorners
@@ -192,7 +194,7 @@ CGContextRef CreateBitmapContext(int width, int height, CGColorSpaceRef colorSpa
     CGImageRef finalImage = CGImageCreateWithMask(imageRef, maskImageRef);
     
     // Turn the image ref into a UIImage
-    UIImage *image = [UIImage imageWithCGImage:finalImage];
+    UIImage *image = [UIImage imageWithCGImage:finalImage scale:[[UIScreen mainScreen] scale] orientation:UIImageOrientationUp];
     
     CGImageRelease(imageRef);
     CGImageRelease(maskImageRef);
@@ -204,9 +206,13 @@ CGContextRef CreateBitmapContext(int width, int height, CGColorSpaceRef colorSpa
 -(void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:animated];
-    
+
+    CGFloat scale = [[UIScreen mainScreen] scale];
+    CGAffineTransform transform = CGAffineTransformScale(CGAffineTransformIdentity, scale, scale);
+
     // Create a 16x16 image that is a red diamond on a black background
-    UIImage *image = [self patternImageWithSize:CGSizeMake(16,16) forRectSize:self.view.frame.size];
+    UIImage *image = [self patternImageWithSize:CGSizeApplyAffineTransform(CGSizeMake(16,16), transform)
+                                    forRectSize:CGSizeApplyAffineTransform(self.view.frame.size, transform)];
 
     // Fill the background of the main view with this pattern
     self.view.backgroundColor = [UIColor colorWithPatternImage:image];
@@ -215,14 +221,14 @@ CGContextRef CreateBitmapContext(int width, int height, CGColorSpaceRef colorSpa
     
     // Create a UIImageView, and an image
     UIImageView *imageView = [[UIImageView alloc] initWithFrame:CGRectMake(100, 20, 120, 120)];
-    imageView.image = [self filledDoughnutForSize:imageView.frame.size];
+    imageView.image = [self filledDoughnutForSize:CGSizeApplyAffineTransform(imageView.frame.size, transform)];
     
     [self.view addSubview:imageView];  // Green doughnut with white center
     
     // Wouldn't it be cool, though, if we could have a green ring with no center?
     
     imageView = [[UIImageView alloc] initWithFrame:CGRectMake(100, 150, 120, 120)];
-    imageView.image = [self emptyDoughnutForSize:imageView.frame.size];
+    imageView.image = [self emptyDoughnutForSize:CGSizeApplyAffineTransform(imageView.frame.size,transform)];
     
     [self.view addSubview:imageView];
 
